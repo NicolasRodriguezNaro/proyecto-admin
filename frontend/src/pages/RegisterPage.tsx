@@ -5,7 +5,7 @@ export default function RegisterPage(){
   const [form,setForm]=useState({
     numDocumento:'', nombreUno:'', nombreDos:'', apellidoUno:'', apellidoDos:'',
     telefono:'', direccion:'', tipoDocumento:'cedula de ciudadania',
-    correo:'', password:'', idRol:3 // ej: 3=ESTUDIANTE
+    correo:'', password:'', idRol:2 // ej: 3=ESTUDIANTE
   });
   const [ok,setOk]=useState(''); const [err,setErr]=useState('');
 

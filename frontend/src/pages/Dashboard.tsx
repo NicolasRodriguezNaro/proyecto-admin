@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 
 export default function Dashboard(){
   const items = [
+    { to: '/me', title: 'Perfil', desc: 'Visualiza la infromacion del usuario'},
     { to:'/catalogo', title:'Catálogo', desc:'Explora todos los libros' },
     { to:'/mis-reservas', title:'Mis reservas', desc:'Consulta y cancela reservas' },
     { to:'/mis-prestamos', title:'Mis préstamos', desc:'Seguimiento de tus préstamos' },
