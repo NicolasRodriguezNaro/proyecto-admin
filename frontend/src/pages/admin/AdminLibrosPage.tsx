@@ -26,7 +26,8 @@ export default function AdminLibrosPage() {
   const [editorial, setEditorial] = useState('');
   const [anioPublicacion, setAnioPublicacion] = useState<number | string>('');
   const [prestable, setPrestable] = useState(true);
-  const [idCategoria, setIdCategoria] = useState<number | string>(''); // Mantenerlo como string inicialmente para el valor del select
+  const [idCategoria, setIdCategoria] = useState<number | null>(null); // Cambiar a number | null
+  
 
   const { data: categorias, isLoading: loadingCategorias } = useCategorias();
   const [success, setSuccess] = useState(false);
@@ -34,8 +35,14 @@ export default function AdminLibrosPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!idCategoria) {
-      alert('Por favor, selecciona una categoría.');
+    if (idCategoria === null) {
+      alert('Por favor, selecciona una categoría válida.');
+      return;
+    }
+
+    const anioNum = Number(anioPublicacion);
+    if (!Number.isInteger(anioNum) || anioNum < 0) {
+      alert('Año de publicación inválido.');
       return;
     }
 
@@ -44,19 +51,20 @@ export default function AdminLibrosPage() {
       titulo,
       descripcion,
       editorial,
-      anioPublicacion,
+      anioPublicacion: anioNum,
       prestable,
-      idCategoria: Number(idCategoria), // Asegúrate de enviar el número correcto
+      idCategoria,
     };
 
     try {
       setLoading(true);
-      const res = await httpJson('/api/libros', {
+      await httpJson('/api/libros', {
         method: 'POST',
         body: JSON.stringify(newLibro),
       });
       setSuccess(true);
       alert('Libro creado exitosamente');
+      loadAll(); // Recargar los libros
     } catch (error) {
       alert('Error al crear el libro.');
     } finally {
@@ -236,8 +244,8 @@ export default function AdminLibrosPage() {
         <div>
           <label className="block text-sm font-medium">Categoría</label>
           <select
-            value={idCategoria} // Ahora simplemente pasa `idCategoria` directamente
-            onChange={(e) => setIdCategoria(e.target.value)} // Cambié a `e.target.value` directamente
+            value={idCategoria ?? ''} // Si `idCategoria` es null, usa la cadena vacía para el valor por defecto
+            onChange={(e) => setIdCategoria(Number(e.target.value))} // Asegurarse de convertir el valor a número
             className="border p-2 w-full"
             required
           >
@@ -245,9 +253,9 @@ export default function AdminLibrosPage() {
             {loadingCategorias ? (
               <option>Loading...</option>
             ) : (
-              categorias?.map((categoria) => (
-                <option key={categoria.idCategoria} value={categoria.idCategoria}>
-                  {categoria.nombre}
+              categorias?.map((c) => (
+                <option key={c.idCategoria} value={c.idCategoria}>
+                  {c.nombre}
                 </option>
               ))
             )}
