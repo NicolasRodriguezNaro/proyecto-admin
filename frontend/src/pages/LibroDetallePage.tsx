@@ -7,6 +7,8 @@ import { useTemasPorLibro } from '@/hooks/useTemas';
 import { useState } from 'react';
 import { httpJson, http } from '@/api/http';
 import { usePerfil } from '@/hooks/usePerfil';
+import { API_BASE } from '@/api/http';
+import ProtectedImage from '@/components/ProtectedImage';
 
 function todayISO() {
   const d = new Date();
@@ -83,9 +85,11 @@ function Responder({ idResena, onOk }:{ idResena:string; onOk:()=>void }) {
 function SubirPortada({
   idLibro,
   onDone,
+  canUpload, // <-- pásalo desde arriba según rol
 }: {
   idLibro: number;
   onDone: () => void;
+  canUpload: boolean;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
@@ -101,20 +105,36 @@ function SubirPortada({
       setSubiendo(true);
       const res = await http(`/api/media/libro/${idLibro}/upload`, {
         method: 'POST',
-        body: fd, // 👈 multipart/form-data (NO poner Content-Type manual)
+        body: fd,
       });
+
+      // Log detallado para saber EXACTAMENTE qué pasa
+      const texto = await res.text().catch(()=> '');
       if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || `HTTP ${res.status}`);
+        if (res.status === 403) {
+          throw new Error('No tienes permisos (ADMIN o BIBLIOTECARIO) para subir portada.');
+        }
+        throw new Error(texto || `Error HTTP ${res.status}`);
       }
-      onDone(); // volver a cargar la media
-    } catch (e: any) {
+
+      // Si todo ok, notifica y hace refetch
+      onDone();
+    } catch (e:any) {
+      console.error('Error subiendo portada:', e);
       alert(e?.message || 'No se pudo subir la portada');
     } finally {
       setSubiendo(false);
       setFile(null);
     }
   };
+
+  if (!canUpload) {
+    return (
+      <div className="mt-3 text-xs text-gray-500">
+        No tienes permisos para subir portada (requiere rol ADMIN o BIBLIOTECARIO).
+      </div>
+    );
+  }
 
   return (
     <div className="mt-3 flex items-center gap-2">
@@ -136,6 +156,7 @@ function SubirPortada({
   );
 }
 
+
 export default function LibroDetallePage() {
   const { id } = useParams();
   const idLibro = Number(id);
@@ -144,6 +165,7 @@ export default function LibroDetallePage() {
   const { data: temas } = useTemasPorLibro(idLibro);
   const { data: me } = usePerfil(); // ← para obtener idUsuario desde /me
   const { data: media, refetch: refetchMedia } = useMediaLibro(idLibro);
+  const canUpload = !!me && (me.nombreRol === 'admin' || me.nombreRol === 'bibliotecario'); 
 
   const [reservando, setReservando] = useState(false);
   const [fechaReserva] = useState<string>(todayISO()); // YYYY-MM-DD seguro
@@ -151,6 +173,11 @@ export default function LibroDetallePage() {
   if (isLoading || !libro) return <div>Cargando…</div>;
 
   const portada = media?.find(m => m.tipoArchivo === 'imagen_portada');
+  const portadaSrc: string | undefined = portada
+    ? `${API_BASE}/api/media/${portada.id}/archivo?v=${encodeURIComponent(
+        portada.fechaSubida ?? String(Date.now())
+      )}`
+    : undefined;
 
   const reservarLibro = async () => {
     if (!me?.idUsuario) { alert('No se pudo identificar el usuario.'); return; }
@@ -178,7 +205,12 @@ export default function LibroDetallePage() {
       <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-6 items-start relative">
         <div>
           {portada ? (
-            <img src={`/api/media/${portada.id}/archivo`} alt="Portada" className="w-44 h-64 object-cover border rounded" />
+            <ProtectedImage
+              mediaId={portada.id}
+              version={portada.fechaSubida} // fuerza refresco cuando cambie
+              alt="Portada"
+              className="w-44 h-64 object-cover border rounded"
+            />
           ) : (
             <div className="w-44 h-64 border rounded flex items-center justify-center italic text-gray-500">
               Sin portada
@@ -199,9 +231,8 @@ export default function LibroDetallePage() {
             {/* ⬇️ Botón para subir portada debajo de “Editorial” */}
             <SubirPortada
               idLibro={idLibro}
-              onDone={() => {
-                refetchMedia(); // vuelve a pedir la media y refresca la portada en pantalla
-              }}
+              canUpload={canUpload}
+              onDone={() => refetchMedia()}
             />
           
           </div>

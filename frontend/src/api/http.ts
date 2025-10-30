@@ -1,6 +1,8 @@
 // src/api/http.ts
 const BASE_URL = import.meta.env.VITE_API_BASE ?? 'http://localhost:8080';
 
+export const API_BASE = BASE_URL;
+
 let accessToken: string | null = localStorage.getItem('access_token');
 let refreshToken: string | null = localStorage.getItem('refresh_token');
 
