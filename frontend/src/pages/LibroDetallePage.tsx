@@ -5,7 +5,7 @@ import { useResenasPorLibro, useCrearResena, useResponderResena, useEliminarRese
 import { useAutoresPorLibro } from '@/hooks/useAutores';
 import { useTemasPorLibro } from '@/hooks/useTemas';
 import { useState } from 'react';
-import { httpJson } from '@/api/http';
+import { httpJson, http } from '@/api/http';
 import { usePerfil } from '@/hooks/usePerfil';
 
 function todayISO() {
@@ -80,14 +80,70 @@ function Responder({ idResena, onOk }:{ idResena:string; onOk:()=>void }) {
   );
 }
 
+function SubirPortada({
+  idLibro,
+  onDone,
+}: {
+  idLibro: number;
+  onDone: () => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+
+  const handleUpload = async () => {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('tipoArchivo', 'imagen_portada');
+    fd.append('descripcion', 'Portada del libro');
+
+    try {
+      setSubiendo(true);
+      const res = await http(`/api/media/libro/${idLibro}/upload`, {
+        method: 'POST',
+        body: fd, // 👈 multipart/form-data (NO poner Content-Type manual)
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || `HTTP ${res.status}`);
+      }
+      onDone(); // volver a cargar la media
+    } catch (e: any) {
+      alert(e?.message || 'No se pudo subir la portada');
+    } finally {
+      setSubiendo(false);
+      setFile(null);
+    }
+  };
+
+  return (
+    <div className="mt-3 flex items-center gap-2">
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        className="text-sm"
+      />
+      <button
+        type="button"
+        onClick={handleUpload}
+        disabled={!file || subiendo}
+        className="px-3 py-1 bg-black text-white rounded disabled:opacity-50"
+      >
+        {subiendo ? 'Subiendo…' : 'Subir portada'}
+      </button>
+    </div>
+  );
+}
+
 export default function LibroDetallePage() {
   const { id } = useParams();
   const idLibro = Number(id);
   const { data: libro, isLoading } = useLibro(idLibro);
-  const { data: media } = useMediaLibro(idLibro);
   const { data: autores } = useAutoresPorLibro(idLibro);
   const { data: temas } = useTemasPorLibro(idLibro);
   const { data: me } = usePerfil(); // ← para obtener idUsuario desde /me
+  const { data: media, refetch: refetchMedia } = useMediaLibro(idLibro);
 
   const [reservando, setReservando] = useState(false);
   const [fechaReserva] = useState<string>(todayISO()); // YYYY-MM-DD seguro
@@ -122,7 +178,7 @@ export default function LibroDetallePage() {
       <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-6 items-start relative">
         <div>
           {portada ? (
-            <img src={`/api/media/${portada.id}/bin`} alt="Portada" className="w-44 h-64 object-cover border rounded" />
+            <img src={`/api/media/${portada.id}/archivo`} alt="Portada" className="w-44 h-64 object-cover border rounded" />
           ) : (
             <div className="w-44 h-64 border rounded flex items-center justify-center italic text-gray-500">
               Sin portada
@@ -139,6 +195,15 @@ export default function LibroDetallePage() {
             <div><span className="font-semibold">Prestabilidad:</span> {libro.prestable ? 'Prestable' : 'Solo consulta en sala'}</div>
             <div><span className="font-semibold">Ejemplares registrados:</span> {libro.cantidadEjemplares}</div>
             {libro.editorial && <div><span className="font-semibold">Editorial:</span> {libro.editorial}</div>}
+
+            {/* ⬇️ Botón para subir portada debajo de “Editorial” */}
+            <SubirPortada
+              idLibro={idLibro}
+              onDone={() => {
+                refetchMedia(); // vuelve a pedir la media y refresca la portada en pantalla
+              }}
+            />
+          
           </div>
         </div>
 
