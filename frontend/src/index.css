@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* opcional: reset de links */
+a {
+  @apply text-blue-600 hover:underline;
+}
+
